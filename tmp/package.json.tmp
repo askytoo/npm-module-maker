@@ -1,0 +1,22 @@
+{
+  "name": "${MODULE_NAME}",
+  "version": "0.1.0",
+  "description": "${MODULE_DESCRIPTION}",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "jest",
+    "build": "tsc --project tsconfig.build.json",
+    "prepare": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://${REMOTE_URL}
+  },
+  "keywords": [],
+  "author": "${GIT_USER}",
+  "license": "ISC",
+  "private": true
+}
