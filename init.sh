@@ -1,23 +1,70 @@
 #!/bin/bash
 
+commonPackages=(
+	"typescript"
+	"@types/node"
+	"eslint"
+	"@typescript-eslint/eslint-plugin"
+	"ts-jest"
+	"@types/jest"
+)
+
+# reactはインストールしないで、sample-viewerのnode_modules内のreactとリンクする
+reactPackages=(
+	"@types/react"
+	"@types/react-dom"
+	"prettier"
+	"tailwindcss"
+	"prettier-plugin-tailwindcss"
+	"@types/prettier"
+	"eslint-config-prettier"
+	"postcss"
+	"postcss-cli"
+	"autoprefixer"
+	"npm-run-all"
+)
+
+# このファイルがあるディレクトリを取得
+startDir=$(pwd)
+
 # 環境変数を取得
 # .envファイルのパスを設定
 ENV_FILE="./.env"
 
 # .envファイルが存在するかチェック
 if [ -f "$ENV_FILE" ]; then
-  # .envファイルの内容を読み込む
-  set -o allexport
-  source "$ENV_FILE"
-  set +o allexport
+	# .envファイルの内容を読み込む
+	# GITHUB_API_KEY
+	# GIT_USER
+	# MODULES_DIR(full path)
+	# VIEWR_DIR(full path)
+	set -o allexport
+	source "$ENV_FILE"
+	set +o allexport
 else
-  echo "$ENV_FILE does not exist."
-  exit 1
+	echo "$ENV_FILE does not exist. please create .env file from .env.tmp file."
+	exit 1
 fi
+
+# GIT_USERが設定されているかチェック
+# GIT_USERが設定されていない場合は終了する
+if [ -z "$GIT_USER" ]; then
+	echo "GIT_USER is not set. please set GIT_USER in .env file."
+	exit 1
+fi
+
+# MODULES_DIRディレクトリが存在するかチェック
+# MODULES_DIRディレクトリが存在しない場合は終了する
+if [ ! -d "$MODULES_DIR" ]; then
+	echo "modules directory does not exist. please create modules directory or set MODULES_DIR in .env file."
+	exit 1
+fi
+
+# モジュールのディレクトリに移動
+cd "$MODULES_DIR" || exit 1
 
 # モジュール名を入力
 # モジュール名がすでに存在する場合はメッセージを出して再度入力を促すことを繰り返す。
-cd my_modules || exit
 while true; do
 	read -p "module name? " moduleName
 	if [ -d "$moduleName" ]; then
@@ -40,17 +87,22 @@ while true; do
 	echo "input y or n."
 done
 
-# ディレクトリの作成と移動
-mkdir "$moduleName"
-cd "$moduleName" || exit
+# Reactを使用する場合は
+if [ "$useReact" == "y" ] || [ "$useReact" == "Y" ]; then
 
-# Gitの初期化
-git init
+	# VIEWER_DIRディレクトリが存在するかチェック
+	# VIEWER_DIRディレクトリが存在しない場合は終了する
+	if [ ! -d "$VIEWER_DIR" ]; then
+		echo "sample viewer directory does not exist. please create sample viewer directory by Next.js or set VIEWER_DIR in .env file."
+		exit 1
+	fi
+
+fi
 
 #リモートリポジトリの作成
 # 正しく入力されるまで繰り返す
 while true; do
-	read -p "make remote repository? (y/n): " createRemote
+	read -p "create remote repository? (y/n): " createRemote
 	if [ "$createRemote" == "y" ] || [ "$createRemote" == "Y" ] || [ "$createRemote" == "n" ] || [ "$createRemote" == "N" ]; then
 		break
 	fi
@@ -58,27 +110,34 @@ while true; do
 done
 
 if [ "$createRemote" == "y" ] || [ "$createRemote" == "Y" ]; then
+	#GITHUB_API_KEYが設定されているかチェック
+	#設定されていない場合は終了する
+	if [ -z "$GITHUB_API_KEY" ]; then
+		echo "GITHUB_API_KEY is not set. please set GITHUB_API_KEY in .env file."
+		exit 1
+	fi
+
 	# リモートリポジトリの作成
 	response=$(
 		curl -L -w '\n%{http_code}' \
 			-X POST \
 			-H "Accept: application/vnd.github+json" \
-			-H "Authorization: Bearer '$GITHUB_APIKEY'" \
+			-H "Authorization: Bearer $GITHUB_API_KEY" \
 			-H "X-GitHub-Api-Version: 2022-11-28" \
 			https://api.github.com/user/repos \
 			-d '{"name":"'$moduleName'", "private": true}'
 	)
 	#ステータスコードが201以外の場合はエラー
 	if [ "${response: -3}" != "201" ]; then
-		echo "failed to create remote repository."
+		echo "failed to create remote repository. please check GITHUB_API_KEY in .env file and try again later."
+		echo "response: $response"
 		exit 1
 	fi
 
-	# リモートリポジトリの登録
+	echo "remote repository created."
+
 	# responseからssh_urlを取得
-	remoteURL=$(echo "$response" | jq -r '.ssh_url')
-	echo "remoteURL: $remoteURL"
-	git remote add origin "$remoteURL"
+	remoteURL=$(echo "$response" | grep -oP '(?<="ssh_url": ")[^"]+')
 
 else
 	# リモートリポジトリの登録を問い合わせ
@@ -93,233 +152,114 @@ else
 
 	if [ "$registerRemote" == "y" ] || [ "$registerRemote" == "Y" ]; then
 		# リモートリポジトリのURLを入力
-		read -p "remote repository URL? example:\"git@github.com:<USER_NAME>/<GIT_REPO>.git\" " remoteURL
+		read -p "remote repository URL? example:\"git@github.com:<GIT_USER>/<GIT_REPO>.git\" " remoteURL
 
 		# リモートリポジトリの登録
 		git remote add origin "$remoteURL"
+		echo "remote repository registered."
 	else
 		remoteURL="git@github.com:'$GIT_USER'/<GIT_REPO>.git"
 	fi
 fi
 
-# package.jsonの作成
-cp 
-echo '{
-  "name": "'$moduleName'",
-  "version": "0.1.0",
-  "description": "'$moduleDescription'",
-  "main": "dist/index.js",
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "test": "jest",
-    "build": "tsc --project tsconfig.build.json",
-    "prepare": "npm run build"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+ssh://'$remoteURL'"
-  },
-  "keywords": [],
-  "author": "'$GIT_USER'",
-  "license": "ISC",
-  "private": true
-}' >package.json
+# ディレクトリの作成と移動
+mkdir "$MODULES_DIR/$moduleName" && echo "$moduleName directory created in $MODULES_DIR."
+cd "$MODULES_DIR/$moduleName" || exit 1
 
-# TypeScriptの初期化
+# カレントディレクトリの取得
+newModuleDir=$(pwd)
 
-# .tsconfig.jsonの修正
-echo '{
-  "compilerOptions": {
-    "target": "es2020",
-    "lib": ["es2020", "dom"],
-    "allowJs": true,
-    "checkJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "esModuleInterop": true,
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "jsx": "react",
-    "sourceMap": true,
-    "rootDir": ".",
-    "outDir": "./dist",
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "declaration": true,
-    "declarationMap": true,
-    "baseUrl": "./src",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
-  },
-  "include": [".eslintrc.cjs", "**/*.ts", "**/*.tsx", "**/*.cjs", "**/*.mjs"],
-  "exclude": ["dist", "node_modules"],
-  "compileOnSave": false
-}' >tsconfig.json
+# Gitの初期化
+git init
 
-echo '{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "rootDir": "./src" 
-  },
-  "include": ["./src/**/*.ts", "./src/**/*.tsx", "./src/**/*.cjs", "./src/**/*.mjs"],
-}' >tsconfig.build.json
+# リモートリポジトリの登録
+git remote add origin "$remoteURL" && echo "remote repository registered."
+
+# tsconfig.jsonの作成
+cp "$startDir"/tmp/tsconfig.json.tmp ./tsconfig.json
+
+# tsconfig.build.jsonの作成
+cp "$startDir"/tmp/tsconfig.build.json.tmp ./tsconfig.build.json
 
 # 必要なディレクトリの作成
 mkdir src
 mkdir __tests__
 
-# index.tsの作成
-touch src/index.ts
+# .eslintrc.cjsの作成
+cp "$startDir"/tmp/.eslintrc.cjs.tmp ./.eslintrc.cjs
 
-#ESlintの初期化
-echo '// eslint-disable-next-line @typescript-eslint/no-var-requires
-const path = require("path");
-
-/** @type {import("eslint").Linter.Config} */
-const config = {
-  overrides: [
-    {
-      extends: [
-        "plugin:@typescript-eslint/recommended-requiring-type-checking",
-      ],
-      files: ["*.ts", "*.tsx"],
-      parserOptions: {
-        project: path.join(__dirname, "tsconfig.json"),
-      },
-    },
-  ],
-  parser: "@typescript-eslint/parser",
-  parserOptions: {
-    project: path.join(__dirname, "tsconfig.json"),
-  },
-  plugins: ["@typescript-eslint"],
-  extends: ["plugin:@typescript-eslint/recommended"],
-  rules: {
-    "@typescript-eslint/consistent-type-imports": [
-      "warn",
-      {
-        prefer: "type-imports",
-        fixStyle: "inline-type-imports",
-      },
-    ],
-    "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-  },
-};
-
-module.exports = config;
-' >.eslintrc.cjs
-
-# 必要なパッケージのインストール
-echo "installing packages typescript @types/node eslint @types/eslint @typescript-eslint/eslint-plugin ts-jest  @types/jest"
-npm i --save-dev typescript @types/node eslint @typescript-eslint/eslint-plugin ts-jest @types/jest
-
-# jestの初期化
-echo '/** @type {import("ts-jest/dist/types").InitialOptionsTsJest} */
-module.exports = {
-    preset: "ts-jest",
-    testEnvironment: "node",
-    testPathIgnorePatterns: ["dist", "node_modules"],
-};' >jest.config.js
+# jest.config.jsの作成
+cp "$startDir"/tmp/jest.config.js.tmp ./jest.config.js
 
 # gitignoreの作成
-echo '/node_modules
-*undo
-/dist
-' >.gitignore
+cp "$startDir"/tmp/.gitignore.tmp ./.gitignore
 
-# Reactを使う場合
-if [ "$useReact" == "y" ] || [ "$useReact" == "Y" ]; then
-	# reactはインストールしないで、sample-viewerのnode_modules内のreactとリンクする
-	echo "installing @types/react @types/react-dom prettier tailwindcss prettier-plugin-tailwindcss @types/prettier eslint-config-prettier postcss postcss-cli autoprefixer npm-run-all"
-	npm i -D @types/react @types/react-dom prettier tailwindcss prettier-plugin-tailwindcss @types/prettier eslint-config-prettier postcss postcss-cli autoprefixer npm-run-all
+# Reactを使うかどうかで処理を分岐
+if [ "$useReact" == "n" ] || [ "$useReact" == "N" ]; then
+	# Reactを使わない場合
+	# package.jsonの作成
+	cp "$startDir"/tmp/package.json.tmp ./package.json
 
-	sed -i "/\"devDependencies\": {/i \"resolve\": {\"alias\": {\"react\": \"./node_modules/react\",\"react-dom\": \"./node_modules/rea ct-dom\"}}," "package.json"
-	echo ''
+	# package.jsonの修正
+	sed -i -e "s/<MODULE_NAME>/$moduleName/g" ./package.json
+	sed -i -e "s/<MODULE_DESCRIPTION>/$moduleDescription/g" ./package.json
+	sed -i -e "s/<GIT_USER>/$GIT_USER/g" ./package.json
+	sed -i -e "s/<REMOTE_URL>/$remoteURL/g" ./package.json
 
-	echo '/** @type {import("tailwindcsss"PostCSS).Config} */
-module.exports = {
-  content: ["./src/**/*.{js,ts,jsx,tsx}"],
-  theme: {
-    extendPostCS: {},
-  },
-  plugins: [],
-};
-' >tailwind.config.js
+	# 必要なパッケージのインストール
+	echo "installing packages ${commonPackages[*]}"
+	npm i -D "${commonPackages[*]}"
 
-	echo '/** @type {import("prettier").Config} */
-const config = {
-  plugins: [require.resolve("prettier-plugin-tailwindcss")],
-};
+	# index.tsの作成
+	touch src/index.ts
 
-module.exports = config;
-' >.prettierrc.cjs
+else
+	# Reactを使う場合
+	# package.jsonの作成
+	cp "$startDir"/tmp/package.json.r.tmp ./package.json
+	sed -i -e "s/<MODULE_NAME>/$moduleName/g" ./package.json
+	sed -i -e "s/<MODULE_DESCRIPTION>/$moduleDescription/g" ./package.json
+	sed -i -e "s/<GIT_USER>/$GIT_USER/g" ./package.json
+	sed -i -e "s/<REMOTE_URL>/$remoteURL/g" ./package.json
 
-	echo 'const config = {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
+	# commonPackagesとreactPackagesを結合
+	packages=("${commonPackages[*]} ${reactPackages[*]}")
+	echo "installing packages ${packages[*]}"
+	npm i -D ${packages[*]}
 
-module.exports = config;
-' >postcss.config.js
+	# tailwind.config.jsの作成
+	cp "$startDir"/tmp/tailwind.config.js.r.tmp ./tailwind.config.js
+
+	# .prettierrc.cjsの作成
+	cp "$startDir"/tmp/.prettierrc.cjs.r.tmp ./.prettierrc.cjs
+
+	# postcss.config.jsの作成
+	cp "$startDir"/tmp/postcss.config.js.r.tmp ./postcss.config.js
 
 	echo '@tailwind base;
 @tailwind components;
 @tailwind utilities;
 ' >src/index.css
 
-	sed -i "/\"build\": \"tsc --project tsconfig.build.json\",/a \"dev\": \"npm-run-all -p watch:*\"," "package.json"
-	sed -i "/\"build\": \"tsc --project tsconfig.build.json\",/a \"watch:css\": \"postcss src/index.css -o dist/index.css --watch\"," "package.json"
-	sed -i "/\"build\": \"tsc --project tsconfig.build.json\",/a \"watch:ts\": \"tsc --project tsconfig.build.json --watch\"," "package.json"
-	sed -i "/\"build\": \"tsc --project tsconfig.build.json\",/a \"build:css\": \"postcss src/index.css -o dist/index.css\"," "package.json"
-	sed -i "/\"build\": \"tsc --project tsconfig.build.json\",/a \"build:ts\": \"tsc --project tsconfig.build.json\"," "package.json"
-	sed -i "s/\"build\": \"tsc --project tsconfig.build.json\",/\"build\": \"npm run build:ts \&\& npm run build:css\",/" "package.json"
-
-	rm src/index.ts
 	# モジュール名からコンポーネント名を作成
 	# -で区切られた文字列をキャメルケースに変換する
 	# https://qiita.com/ryounagaoka/items/2b2e5d5d0d0c1c4b6b0e
 	# 例: sample-module-name -> SampleModuleName
 	componentName=$(echo "$moduleName" | sed -e "s/\(^\|-\)\([a-z]\)/\U\2/g")
 
-	echo 'import React from "react";
-
-const '$componentName': React.FC = () => {
-  const [count, setCount] = React.useState(0);
-  return (
-    <div className="flex items-center justify-center h-screen flex-col">
-      <div className="flex justify-center">
-        <h1 className="text-4xl">'$moduleName'</h1>
-      </div>
-      <div className="flex justify-center text-center items-center pt-4 gap-3">
-        <button
-          className="rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700"
-          onClick={() => setCount(count + 1)}
-        >
-          Click me
-        </button>
-        <p>count: {count}</p>
-      </div>
-    </div>
-  );
-};
-
-export default '$componentName';
-' >src/index.tsx
+	# src/index.tsxの作成
+	cp "$startDir"/tmp/index.tsx.r.tmp ./src/index.tsx
+	sed -i -e "s/<MODULE_NAME>/$moduleName/g" ./src/index.tsx
+	sed -i -e "s/<COMPONENT_NAME>/$componentName/g" ./src/index.tsx
 
 	npm run build
 
-	sudo npm link ../sample-viwer/node_modules/react
+	sudo npm link "$VIEWER_DIR"/node_modules/react
 	sudo npm link
 
 	#モジュールを確認する側(sample-viewr)の設定
-	cd ../sample-viwer/ || exit
-	npm i ../"$moduleName"
+	cd "$VIEWER_DIR" || exit 1
+	npm i "$newModuleDir"
 	sudo npm link "$moduleName"
 
 	sed -i "/const modules = \[/a {name: '$moduleName', path: '\/$moduleName'}," "src/pages/index.tsx"

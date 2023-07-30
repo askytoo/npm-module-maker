@@ -1,0 +1,27 @@
+{
+  "name": "<MODULE_NAME>",
+  "version": "0.1.0",
+  "description": "<MODULE_DESCRIPTION>",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "jest",
+    "build": "npm run build:ts && npm run build:css",
+    "build:ts": "tsc --project tsconfig.build.json",
+    "build:css": "postcss src/index.css -o dist/index.css",
+    "watch:ts": "tsc --project tsconfig.build.json --watch",
+    "watch:css": "postcss src/index.css -o dist/index.css --watch",
+    "dev": "npm-run-all -p watch:*",
+    "prepare": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://<REMOTE_URL>"
+  },
+  "keywords": [],
+  "author": "<GIT_USER>",
+  "license": "ISC",
+  "private": true
+}

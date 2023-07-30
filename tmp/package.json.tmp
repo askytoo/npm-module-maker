@@ -1,7 +1,7 @@
 {
-  "name": "${MODULE_NAME}",
+  "name": "<MODULE_NAME>",
   "version": "0.1.0",
-  "description": "${MODULE_DESCRIPTION}",
+  "description": "<MODULE_DESCRIPTION>",
   "main": "dist/index.js",
   "files": [
     "dist"
@@ -16,7 +16,7 @@
     "url": "git+ssh://${REMOTE_URL}
   },
   "keywords": [],
-  "author": "${GIT_USER}",
+  "author": "<GIT_USER>",
   "license": "ISC",
   "private": true
 }

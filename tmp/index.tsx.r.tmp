@@ -1,0 +1,24 @@
+import React from "react";
+
+const <COMPONENT_NAME>: React.FC = () => {
+  const [count, setCount] = React.useState(0);
+  return (
+    <div className="flex items-center justify-center h-screen flex-col">
+      <div className="flex justify-center">
+        <h1 className="text-4xl"><MODULE_NAME></h1>
+      </div>
+      <div className="flex justify-center text-center items-center pt-4 gap-3">
+        <button
+          className="rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700"
+          onClick={() => setCount(count + 1)}
+        >
+          Click me
+        </button>
+        <p>count: {count}</p>
+      </div>
+    </div>
+  );
+};
+
+export default <COMPONENT_NAME>;
+
