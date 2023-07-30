@@ -3,7 +3,25 @@
 # React Component Module用に作成したものを削除していく
 # モジュール名を入力
 # モジュール名がすでに存在する場合はメッセージを出して再度入力を促すことを繰り返す。
-cd my_modules || exit
+# .envファイルのパスを設定
+ENV_FILE="./.env"
+
+# .envファイルが存在するかチェック
+if [ -f "$ENV_FILE" ]; then
+	# .envファイルの内容を読み込む
+	# GITHUB_API_KEY
+	# GIT_USER
+	# MODULES_DIR(full path)
+	# VIEWR_DIR(full path)
+	set -o allexport
+	source "$ENV_FILE"
+	set +o allexport
+else
+	echo "$ENV_FILE does not exist. please create .env file from .env.tmp file."
+	exit 1
+fi
+
+cd "$MODULES_DIR" || exit 1
 while true; do
 	read -p "remove module name? " moduleName
 	if [ -d "$moduleName" ]; then
@@ -17,7 +35,7 @@ done
 rm -rf "$moduleName" && echo "remove $moduleName directory."
 
 # 確認側の設定を削除する
-cd sample-viwer || exit 
+cd "$VIEWER_DIR" || exit 1
 
 # モジュールを削除
 sudo npm unlink "$moduleName" && echo "remove $moduleName from sample-viwer."

@@ -16,7 +16,6 @@ reactPackages=(
 	"prettier"
 	"tailwindcss"
 	"prettier-plugin-tailwindcss"
-	"@types/prettier"
 	"eslint-config-prettier"
 	"postcss"
 	"postcss-cli"
@@ -154,11 +153,8 @@ else
 		# リモートリポジトリのURLを入力
 		read -p "remote repository URL? example:\"git@github.com:<GIT_USER>/<GIT_REPO>.git\" " remoteURL
 
-		# リモートリポジトリの登録
-		git remote add origin "$remoteURL"
-		echo "remote repository registered."
 	else
-		remoteURL="git@github.com:'$GIT_USER'/<GIT_REPO>.git"
+		remoteURL="git@github.com:$GIT_USER/<GIT_REPO>.git"
 	fi
 fi
 
@@ -172,8 +168,10 @@ newModuleDir=$(pwd)
 # Gitの初期化
 git init
 
-# リモートリポジトリの登録
-git remote add origin "$remoteURL" && echo "remote repository registered."
+if [ "$createRemote" == "y" ] || [ "$createRemote" == "Y" ] || [ "$registerRemote" == "y" ] || [ "$registerRemote" == "Y" ]; then
+    # リモートリポジトリの登録
+    git remote add origin "$remoteURL" && echo "remote repository registered."
+fi
 
 # tsconfig.jsonの作成
 cp "$startDir"/tmp/tsconfig.json.tmp ./tsconfig.json
@@ -220,7 +218,7 @@ else
 	sed -i -e "s/<MODULE_NAME>/$moduleName/g" ./package.json
 	sed -i -e "s/<MODULE_DESCRIPTION>/$moduleDescription/g" ./package.json
 	sed -i -e "s/<GIT_USER>/$GIT_USER/g" ./package.json
-	sed -i -e "s/<REMOTE_URL>/$remoteURL/g" ./package.json
+	sed -i -e "s|<REMOTE_URL>|$remoteURL|g" ./package.json
 
 	# commonPackagesとreactPackagesを結合
 	packages=("${commonPackages[*]} ${reactPackages[*]}")
@@ -252,6 +250,7 @@ else
 	sed -i -e "s/<MODULE_NAME>/$moduleName/g" ./src/index.tsx
 	sed -i -e "s/<COMPONENT_NAME>/$componentName/g" ./src/index.tsx
 
+	# npm link時にもprepareによるbuildが実行されるが、権限が付与されないため、ここで一度buildする
 	npm run build
 
 	sudo npm link "$VIEWER_DIR"/node_modules/react

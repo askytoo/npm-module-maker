@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://${REMOTE_URL}
+    "url": "git+ssh://<REMOTE_URL>"
   },
   "keywords": [],
   "author": "<GIT_USER>",
