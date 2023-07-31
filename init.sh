@@ -1,5 +1,33 @@
 #!/bin/bash
 
+# messageを出力する関数を定義
+printError() {
+  # エラーメッセージを引数から取得
+  errorMessage="$1"
+
+  # 赤色の文字を出力
+  echo -e "\n\e[31mError: $errorMessage\e[0m"
+}
+
+printInfo() {
+  # エラーメッセージを引数から取得
+  infoMessage="$1"
+
+  # 青色の文字を出力
+  echo -e "\n\e[34mInfo: $infoMessage\e[0m"
+}
+
+printWarning() {
+  # エラーメッセージを引数から取得
+  warningMessage="$1"
+
+  # 黄色の文字を出力
+  echo -e "\n\e[33mWarning: $warningMessage\e[0m"
+}
+
+
+
+
 commonPackages=(
 	"typescript"
 	"@types/node"
@@ -24,7 +52,7 @@ reactPackages=(
 )
 
 # このファイルがあるディレクトリを取得
-startDir=$(pwd)
+scriptDir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # 環境変数を取得
 # .envファイルのパスを設定
@@ -41,21 +69,21 @@ if [ -f "$ENV_FILE" ]; then
 	source "$ENV_FILE"
 	set +o allexport
 else
-	echo "$ENV_FILE does not exist. please create .env file from .env.tmp file."
+	printError "$ENV_FILE does not exist. please create .env file from .env.tmp file."
 	exit 1
 fi
 
 # GIT_USERが設定されているかチェック
 # GIT_USERが設定されていない場合は終了する
 if [ -z "$GIT_USER" ]; then
-	echo "GIT_USER is not set. please set GIT_USER in .env file."
+	printError "GIT_USER is not set. please set GIT_USER in .env file."
 	exit 1
 fi
 
 # MODULES_DIRディレクトリが存在するかチェック
 # MODULES_DIRディレクトリが存在しない場合は終了する
 if [ ! -d "$MODULES_DIR" ]; then
-	echo "modules directory does not exist. please create modules directory or set MODULES_DIR in .env file."
+	printError "modules directory does not exist. please create modules directory or set MODULES_DIR in .env file."
 	exit 1
 fi
 
@@ -67,7 +95,7 @@ cd "$MODULES_DIR" || exit 1
 while true; do
 	read -p "module name? " moduleName
 	if [ -d "$moduleName" ]; then
-		echo "module name already exists."
+		printWarning "module name already exists."
 	else
 		break
 	fi
@@ -83,7 +111,7 @@ while true; do
 	if [ "$useReact" == "y" ] || [ "$useReact" == "Y" ] || [ "$useReact" == "n" ] || [ "$useReact" == "N" ]; then
 		break
 	fi
-	echo "input y or n."
+	printWarning "input y or n."
 done
 
 # Reactを使用する場合は
@@ -92,7 +120,7 @@ if [ "$useReact" == "y" ] || [ "$useReact" == "Y" ]; then
 	# VIEWER_DIRディレクトリが存在するかチェック
 	# VIEWER_DIRディレクトリが存在しない場合は終了する
 	if [ ! -d "$VIEWER_DIR" ]; then
-		echo "sample viewer directory does not exist. please create sample viewer directory by Next.js or set VIEWER_DIR in .env file."
+		printError "sample viewer directory does not exist. please create sample viewer directory by Next.js or set VIEWER_DIR in .env file."
 		exit 1
 	fi
 
@@ -105,14 +133,14 @@ while true; do
 	if [ "$createRemote" == "y" ] || [ "$createRemote" == "Y" ] || [ "$createRemote" == "n" ] || [ "$createRemote" == "N" ]; then
 		break
 	fi
-	echo "input y or n."
+	printWarning "input y or n."
 done
 
 if [ "$createRemote" == "y" ] || [ "$createRemote" == "Y" ]; then
 	#GITHUB_API_KEYが設定されているかチェック
 	#設定されていない場合は終了する
 	if [ -z "$GITHUB_API_KEY" ]; then
-		echo "GITHUB_API_KEY is not set. please set GITHUB_API_KEY in .env file."
+		printError "GITHUB_API_KEY is not set. please set GITHUB_API_KEY in .env file."
 		exit 1
 	fi
 
@@ -128,12 +156,12 @@ if [ "$createRemote" == "y" ] || [ "$createRemote" == "Y" ]; then
 	)
 	#ステータスコードが201以外の場合はエラー
 	if [ "${response: -3}" != "201" ]; then
-		echo "failed to create remote repository. please check GITHUB_API_KEY in .env file and try again later."
+		printError "failed to create remote repository. please check GITHUB_API_KEY in .env file and try again later."
 		echo "response: $response"
 		exit 1
 	fi
 
-	echo "remote repository created."
+	printInfo "remote repository created."
 
 	# responseからssh_urlを取得
 	remoteURL=$(echo "$response" | grep -oP '(?<="ssh_url": ")[^"]+')
@@ -146,7 +174,7 @@ else
 		if [ "$registerRemote" == "y" ] || [ "$registerRemote" == "Y" ] || [ "$registerRemote" == "n" ] || [ "$registerRemote" == "N" ]; then
 			break
 		fi
-		echo "input y or n."
+		printWarning "input y or n."
 	done
 
 	if [ "$registerRemote" == "y" ] || [ "$registerRemote" == "Y" ]; then
@@ -159,7 +187,7 @@ else
 fi
 
 # ディレクトリの作成と移動
-mkdir "$MODULES_DIR/$moduleName" && echo "$moduleName directory created in $MODULES_DIR."
+mkdir "$MODULES_DIR/$moduleName" && printInfo "$moduleName directory created in $MODULES_DIR."
 cd "$MODULES_DIR/$moduleName" || exit 1
 
 # カレントディレクトリの取得
@@ -170,33 +198,33 @@ git init
 
 if [ "$createRemote" == "y" ] || [ "$createRemote" == "Y" ] || [ "$registerRemote" == "y" ] || [ "$registerRemote" == "Y" ]; then
     # リモートリポジトリの登録
-    git remote add origin "$remoteURL" && echo "remote repository registered."
+    git remote add origin "$remoteURL" && printInfo "remote repository registered."
 fi
 
 # tsconfig.jsonの作成
-cp "$startDir"/tmp/tsconfig.json.tmp ./tsconfig.json
+cp "$scriptDir"/tmp/tsconfig.json.tmp ./tsconfig.json
 
 # tsconfig.build.jsonの作成
-cp "$startDir"/tmp/tsconfig.build.json.tmp ./tsconfig.build.json
+cp "$scriptDir"/tmp/tsconfig.build.json.tmp ./tsconfig.build.json
 
 # 必要なディレクトリの作成
 mkdir src
 mkdir __tests__
 
 # .eslintrc.cjsの作成
-cp "$startDir"/tmp/.eslintrc.cjs.tmp ./.eslintrc.cjs
+cp "$scriptDir"/tmp/.eslintrc.cjs.tmp ./.eslintrc.cjs
 
 # jest.config.jsの作成
-cp "$startDir"/tmp/jest.config.js.tmp ./jest.config.js
+cp "$scriptDir"/tmp/jest.config.js.tmp ./jest.config.js
 
 # gitignoreの作成
-cp "$startDir"/tmp/.gitignore.tmp ./.gitignore
+cp "$scriptDir"/tmp/.gitignore.tmp ./.gitignore
 
 # Reactを使うかどうかで処理を分岐
 if [ "$useReact" == "n" ] || [ "$useReact" == "N" ]; then
 	# Reactを使わない場合
 	# package.jsonの作成
-	cp "$startDir"/tmp/package.json.tmp ./package.json
+	cp "$scriptDir"/tmp/package.json.tmp ./package.json
 
 	# package.jsonの修正
 	sed -i -e "s/<MODULE_NAME>/$moduleName/g" ./package.json
@@ -205,8 +233,8 @@ if [ "$useReact" == "n" ] || [ "$useReact" == "N" ]; then
 	sed -i -e "s/<REMOTE_URL>/$remoteURL/g" ./package.json
 
 	# 必要なパッケージのインストール
-	echo "installing packages ${commonPackages[*]}"
-	npm i -D "${commonPackages[*]}"
+	printInfo "installing packages ${commonPackages[*]}"
+	npm i -D ${commonPackages[*]}
 
 	# index.tsの作成
 	touch src/index.ts
@@ -214,7 +242,7 @@ if [ "$useReact" == "n" ] || [ "$useReact" == "N" ]; then
 else
 	# Reactを使う場合
 	# package.jsonの作成
-	cp "$startDir"/tmp/package.json.r.tmp ./package.json
+	cp "$scriptDir"/tmp/package.json.r.tmp ./package.json
 	sed -i -e "s/<MODULE_NAME>/$moduleName/g" ./package.json
 	sed -i -e "s/<MODULE_DESCRIPTION>/$moduleDescription/g" ./package.json
 	sed -i -e "s/<GIT_USER>/$GIT_USER/g" ./package.json
@@ -222,17 +250,17 @@ else
 
 	# commonPackagesとreactPackagesを結合
 	packages=("${commonPackages[*]} ${reactPackages[*]}")
-	echo "installing packages ${packages[*]}"
+	printInfo "installing packages ${packages[*]}"
 	npm i -D ${packages[*]}
 
 	# tailwind.config.jsの作成
-	cp "$startDir"/tmp/tailwind.config.js.r.tmp ./tailwind.config.js
+	cp "$scriptDir"/tmp/tailwind.config.js.r.tmp ./tailwind.config.js
 
 	# .prettierrc.cjsの作成
-	cp "$startDir"/tmp/.prettierrc.cjs.r.tmp ./.prettierrc.cjs
+	cp "$scriptDir"/tmp/.prettierrc.cjs.r.tmp ./.prettierrc.cjs
 
 	# postcss.config.jsの作成
-	cp "$startDir"/tmp/postcss.config.js.r.tmp ./postcss.config.js
+	cp "$scriptDir"/tmp/postcss.config.js.r.tmp ./postcss.config.js
 
 	echo '@tailwind base;
 @tailwind components;
@@ -241,12 +269,11 @@ else
 
 	# モジュール名からコンポーネント名を作成
 	# -で区切られた文字列をキャメルケースに変換する
-	# https://qiita.com/ryounagaoka/items/2b2e5d5d0d0c1c4b6b0e
 	# 例: sample-module-name -> SampleModuleName
 	componentName=$(echo "$moduleName" | sed -e "s/\(^\|-\)\([a-z]\)/\U\2/g")
 
 	# src/index.tsxの作成
-	cp "$startDir"/tmp/index.tsx.r.tmp ./src/index.tsx
+	cp "$scriptDir"/tmp/index.tsx.r.tmp ./src/index.tsx
 	sed -i -e "s/<MODULE_NAME>/$moduleName/g" ./src/index.tsx
 	sed -i -e "s/<COMPONENT_NAME>/$componentName/g" ./src/index.tsx
 
@@ -282,4 +309,4 @@ export default '$componentName'Viwer;
 fi
 
 # 完了メッセージの表示
-echo "complete!!!"
+printInfo "complete!!!"
